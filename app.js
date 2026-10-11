@@ -2,7 +2,7 @@
 // Logic lives in plan.js / course.js / engine.js / sim.js (core) and route.js (route).
 import { buildPlan, planTimeAt, kmSplits, fmtClock, fmtPace } from './plan.js';
 import { AID_STATIONS, FUEL, MARKERS } from './course.js';
-import { RaceEngine } from './engine.js';
+import { RaceEngine, sayPace, sayClock, sayAhead } from './engine.js';
 import { simulateRun } from './sim.js';
 import { ROUTE } from './route.js';
 
@@ -877,6 +877,7 @@ function fillSettings() {
   renderNudge();
   disarmReset();
   refreshVersion();
+  renderTesterStatus();
 }
 
 function renderNudge() {
@@ -979,11 +980,13 @@ el.sReset.addEventListener('click', () => {
   toast('Race reset.');
 });
 
-$('#btn-settings').addEventListener('click', () => {
+function openSettings() {
   fillSettings();
+  if (el.settings.open) return;
   if (typeof el.settings.showModal === 'function') el.settings.showModal();
   else el.settings.setAttribute('open', '');
-});
+}
+$('#btn-settings').addEventListener('click', openSettings);
 el.settings.addEventListener('click', (e) => {
   if (e.target === el.settings) el.settings.close();   // tap on the backdrop
 });
@@ -1035,6 +1038,104 @@ $('#btn-lock').addEventListener('click', lock);
 document.addEventListener('click', () => {
   if (mode !== 'idle' && settings.voice && voice.supported && !voice.primed) voice.prime('Voice on.');
 }, true);
+
+// ------------------------------------------------------------------ voice cue tester
+// Plays example cues through the same voice queue as the race (voice.enqueue with the
+// engine's priorities). Wording copies engine.js; the numbers use its say* helpers.
+// It never touches the engine or the race state.
+const TEST_CUES = [
+  ['split', 'km split', 2, `Kilometer 12. Split ${sayPace(297)}. ${sayAhead(12)}.`],
+  ['projected', 'km split with projection (km 31 on)', 2, `Kilometer 34. Split ${sayPace(288)}. ${sayAhead(25)}. Projected ${sayClock(12540 - 25)}.`],
+  ['half', 'Halfway', 2, `Halfway in ${sayClock(6330)}. Plan ${sayClock(6337)}. ${sayAhead(7)}.`],
+  ['gelwarn', 'Gel warning (400 m before)', 1, 'Gel 3 coming up, Beta Fuel plus Electrolyte. Aid station in 800 meters.'],
+  ['gelnow', 'Gel now', 1, 'Gel 3. Take it now, in small squeezes. Water in 400 meters.'],
+  ['capsule', 'Salt capsule', 1, 'Aid 5 in 200 meters. Salt capsule at this aid station, with a full cup of water.'],
+  ['aid', 'Aid station heads-up', 3, 'Aid station 9 in 200 meters.'],
+  ['behind', 'Off pace, behind', 2, '35 seconds behind plan. Pick it up a little.'],
+  ['ahead', 'Off pace, ahead (before 30K only)', 2, '50 seconds ahead of plan. Ease off a little.'],
+  ['settle', 'km 3 settle', 3, 'Settle in. Stay relaxed with the 3 35 group.'],
+  ['decision', '30K decision', 2, 'Decision point. Feeling strong: 4 48 from 32 K, then 4 43 after 35 K. If not, hold 4 53.'],
+  ['hill', 'Mile 26 hill', 2, 'Mile 26 ahead. Right onto Roosevelt for a short hill. Quick steps to the top, then 300 meters to go.'],
+  ['finish', 'Finish', 1, `Finish. ${sayClock(12495)}. 45 seconds under plan.`],
+].map(([key, label, priority, text]) => ({ key, label, priority, text }));
+window.__testCues = TEST_CUES;
+
+const tester = { list: $('#t-list'), status: $('#t-status'), all: $('#t-all'), stop: $('#t-stop'), run: null };
+
+function renderTesterStatus() {
+  const v = voice.supported ? voice.pickVoice() : null;
+  const sess = navigator.audioSession ? navigator.audioSession.type : 'not available';
+  const sp = voice.supported ? 'Speech supported' : 'No speech synthesis in this browser';
+  const off = settings.voice ? '' : ' Voice cues are off above.';
+  tester.status.textContent = `${sp}. Voice: ${v ? `${v.name} (${v.lang})` : 'system default'}. Audio session: ${sess}.${off}`;
+  tester.all.disabled = !!tester.run;
+}
+
+tester.list.innerHTML = TEST_CUES.map((c, i) =>
+  `<li data-i="${i}"><button class="btn btn-play" type="button" data-i="${i}" aria-label="Play ${esc(c.label)}">▶</button><span><b>${esc(c.label)}</b><small>${esc(c.text)}</small></span></li>`).join('');
+
+function markPlaying(i) {
+  for (const li of tester.list.children) li.classList.toggle('playing', Number(li.dataset.i) === i);
+}
+
+function playTestCue(i) {
+  if (!voice.supported) { toast('This browser has no speech synthesis.'); return false; }
+  if (!settings.voice) { toast('Voice cues are off. Turn them on above.'); return false; }
+  const c = TEST_CUES[i];
+  voice.setSession();
+  voice.primed = true;   // the tap that got us here is the gesture iOS needs
+  voice.enqueue({ id: `tester-${c.key}`, priority: c.priority, text: c.text });
+  markPlaying(i);
+  renderTesterStatus();
+  return true;
+}
+
+function stopTesterRun() {
+  if (tester.run) clearInterval(tester.run.timer);
+  tester.run = null;
+  markPlaying(-1);
+  renderTesterStatus();
+}
+
+// Play all: one cue at a time, 1.5 s of silence between them.
+function stepTesterRun() {
+  const r = tester.run;
+  if (!r) return;
+  if (voice.current || voice.queue.length) { r.gapUntil = 0; return; }
+  const t = performance.now();
+  if (!r.gapUntil) { r.gapUntil = t + 1500; return; }
+  if (t < r.gapUntil) return;
+  r.i += 1;
+  r.gapUntil = 0;
+  if (r.i >= TEST_CUES.length) { stopTesterRun(); return; }
+  playTestCue(r.i);
+}
+
+tester.list.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn-play');
+  if (!b) return;
+  stopTesterRun();
+  playTestCue(Number(b.dataset.i));
+});
+tester.all.addEventListener('click', () => {
+  if (mode === 'race' && lastState && !lastState.finished) {
+    toast('Play all is off during a race. Tap single cues.');
+    return;
+  }
+  stopTesterRun();
+  voice.stop();
+  if (!playTestCue(0)) return;
+  tester.run = { i: 0, gapUntil: 0, timer: setInterval(stepTesterRun, 200) };
+  renderTesterStatus();
+});
+tester.stop.addEventListener('click', () => {
+  stopTesterRun();
+  voice.stop();
+});
+$('#btn-test-cues').addEventListener('click', () => {
+  openSettings();
+  requestAnimationFrame(() => $('#tester').scrollIntoView({ block: 'start' }));
+});
 
 // ------------------------------------------------------------------ lifecycle
 document.addEventListener('visibilitychange', () => {

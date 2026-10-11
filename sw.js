@@ -1,6 +1,6 @@
 // Chicago Pacer service worker: cache-first, fully offline after one load.
 // Bump VERSION whenever any cached file changes; old caches are deleted on activate.
-const VERSION = 'v6';
+const VERSION = 'v7';
 const CACHE = `chicago-pacer-${VERSION}`;
 const ASSETS = [
   './',

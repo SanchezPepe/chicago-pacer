@@ -46,7 +46,10 @@
           </li>
           <li>
             <span class="check-k">Voice</span>
-            <button id="btn-test-voice" class="btn btn-small" type="button">Test voice</button>
+            <span class="check-btns">
+              <button id="btn-test-cues" class="btn btn-small btn-quiet-inline" type="button">Test cues</button>
+              <button id="btn-test-voice" class="btn btn-small" type="button">Test voice</button>
+            </span>
           </li>
         </ul>
         <p id="r-gps-hint" class="hint hint-warn" hidden>Allow location: Settings → Privacy &amp; Security → Location Services → Safari Websites → While Using.</p>
@@ -275,6 +278,16 @@
         <button id="s-nudge-plus" class="btn btn-small" type="button">+5 s</button>
       </div>
     </div>
+
+    <section id="tester" class="tester" aria-labelledby="tester-h">
+      <h3 id="tester-h">Voice cue tester</h3>
+      <p id="t-status" class="hint">Checking speech…</p>
+      <div class="tester-ctl">
+        <button id="t-all" class="btn btn-small" type="button">Play all</button>
+        <button id="t-stop" class="btn btn-small" type="button">Stop</button>
+      </div>
+      <ol id="t-list" class="tester-list"></ol>
+    </section>
 
     <button id="s-rehearse" class="btn btn-quiet" type="button">Rehearse the race at 60×</button>
     <button id="s-reset" class="btn btn-danger" type="button">Reset race</button>
