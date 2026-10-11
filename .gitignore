@@ -1,0 +1,11 @@
+# Verification scripts and screenshots
+verify/
+
+# tools/: only the build scripts are published. The official course map
+# copies (PNG/PDF), crops and caches stay out of the public repo.
+tools/*
+!tools/*.py
+!tools/*.mjs
+
+__pycache__/
+.DS_Store

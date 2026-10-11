@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#071018">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pacer">
+<meta name="format-detection" content="telephone=no">
+<!-- avoid-ai-design-ignore: K7 (focus rings are defined in styles.css with :focus-visible) -->
+<title>Chicago Pacer</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="preload" href="fonts/BigShouldersDisplay-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="app">
+  <main class="tabs">
+
+    <!-- ===================== Race ===================== -->
+    <section id="tab-race" class="tab tab-race" aria-label="Race">
+
+      <div id="ready" class="ready">
+        <p class="kicker">Chicago, Sunday Oct 11. Wave 1, Corral E.</p>
+        <div class="ready-target">
+          <span class="lbl">Finish target</span>
+          <span id="r-target" class="num num-xl">3:29:00</span>
+          <span id="r-profile" class="sub">Friend's plan</span>
+        </div>
+        <ol id="r-checkpoints" class="checkpoints" aria-label="Checkpoints"></ol>
+
+        <ul class="checks">
+          <li>
+            <span class="check-k">GPS</span>
+            <span id="r-gps" class="check-v">Waiting for location…</span>
+          </li>
+          <li>
+            <span class="check-k">Screen</span>
+            <span id="r-wake" class="check-v">Checking…</span>
+          </li>
+          <li>
+            <span class="check-k">Voice</span>
+            <button id="btn-test-voice" class="btn btn-small" type="button">Test voice</button>
+          </li>
+        </ul>
+        <p id="r-gps-hint" class="hint hint-warn" hidden>Allow location: Settings → Privacy &amp; Security → Location Services → Safari Websites → While Using.</p>
+        <p id="r-wake-hint" class="hint hint-warn" hidden>The screen can't be held on. Set Settings → Display &amp; Brightness → Auto-Lock → Never.</p>
+
+        <button id="btn-start" class="btn btn-start" type="button">Start</button>
+        <p class="hint">Tap as you cross the start mat.</p>
+        <button id="btn-rehearse" class="btn btn-quiet" type="button">Rehearse at 60× (3½ min)</button>
+      </div>
+
+      <div id="live" class="live" hidden>
+        <div class="live-status">
+          <span id="l-gps" class="pill">GPS</span>
+          <button id="l-sim" class="pill pill-btn" type="button" hidden>Stop rehearsal</button>
+          <span id="l-wake" class="pill">Screen</span>
+        </div>
+        <button id="l-voice-fix" class="banner" type="button" hidden>Voice is off. Tap here to turn it on.</button>
+
+        <div class="live-top">
+          <div class="cell">
+            <span class="lbl">km</span>
+            <span id="l-km" class="num num-l">0.0</span>
+          </div>
+          <div class="cell cell-right">
+            <span class="lbl">Elapsed</span>
+            <span id="l-elapsed" class="num num-l">0:00</span>
+          </div>
+        </div>
+
+        <div id="l-delta-box" class="delta">
+          <span id="l-delta" class="num num-huge">0:00</span>
+          <span id="l-delta-lbl" class="delta-lbl">on plan</span>
+        </div>
+
+        <div class="live-paces">
+          <div class="cell">
+            <span class="lbl">Target pace</span>
+            <span id="l-target" class="num num-m">–:––</span>
+          </div>
+          <div class="cell cell-right">
+            <span class="lbl">Current pace</span>
+            <span id="l-now" class="num num-m">–:––</span>
+          </div>
+        </div>
+
+        <p id="l-next" class="next"></p>
+        <p id="l-cue" class="cue" aria-live="polite"></p>
+
+        <div id="flag" class="flag" role="img" aria-label="Course progress">
+          <span class="stripe stripe-top"><i></i></span>
+          <span class="stripe stripe-bottom"><i></i></span>
+          <span id="flag-stars" class="flag-stars"></span>
+          <span class="flag-you"><b></b></span>
+        </div>
+        <div class="flag-scale"><span>Start</span><span>Half</span><span>Finish</span></div>
+
+        <div class="live-actions">
+          <button id="btn-mark" class="btn btn-action" type="button">Mark km</button>
+          <button id="btn-lock" class="btn btn-action" type="button">Lock</button>
+        </div>
+      </div>
+
+      <div id="done" class="done" hidden>
+        <span class="lbl">Finished</span>
+        <span id="d-time" class="num num-xl">3:29:00</span>
+        <p id="d-detail" class="sub"></p>
+        <p id="d-hint" class="hint">Reset the race in Settings when you're done looking at this.</p>
+        <button id="btn-done-back" class="btn btn-quiet" type="button" hidden>Back to the start screen</button>
+      </div>
+    </section>
+
+    <!-- ===================== Band ===================== -->
+    <section id="tab-band" class="tab tab-band" aria-label="Pace band" hidden>
+      <header class="tab-head">
+        <h2>Pace band</h2>
+        <p id="band-sub" class="sub">Friend's plan, 3:29:00</p>
+        <p class="hint">Clock is chip time. The course clocks show wave time from 7:35.</p>
+      </header>
+      <div class="band-cols" aria-hidden="true"><span>km</span><span>Pace</span><span>Clock</span></div>
+      <div id="band" class="band"></div>
+    </section>
+
+    <!-- ===================== Plan ===================== -->
+    <section id="tab-plan" class="tab tab-plan" aria-label="Race plan" hidden>
+      <header class="tab-head">
+        <h2>Race plan</h2>
+        <p id="plan-sub" class="sub">3:29:00, negative split</p>
+      </header>
+
+      <div class="prose">
+        <h3>Checkpoints</h3>
+        <ol id="plan-checkpoints" class="checkpoints"></ol>
+        <p>If halfway is 1:46:30 or slower, sub-3:30 needs 4:50/km in the heat. Hold steady and decide again at 30K.</p>
+
+        <h3>Three rules</h3>
+        <ol class="rules">
+          <li><b>Ease down across the first 10K.</b> 5:10 → 5:00 is a slope, not 10 km at 5:10 (that's 51:40 and leaves 4:53/km for 32 km in the heat).</li>
+          <li><b>No surge after 10K.</b> km 11 is 4:57, not 4:50. Making up time at km 10–15 is how this plan fails.</li>
+          <li><b>Hit the checkpoints.</b> 10K in 50:30–51:00, half by 1:46:00, 30K around 2:29:20.</li>
+        </ol>
+
+        <h3>Section by section</h3>
+        <dl class="sections">
+          <dt>km 0–10: the Loop → Lincoln Park</dt>
+          <dd>5:10 → 5:00. GPS is useless in the Loop; trust the clock. Tuck in with the 3:35 group (Corral E, ~5:06/km) and edge ahead of it by km 8–10.</dd>
+          <dt>km 10–21.1</dt>
+          <dd>4:57 → 4:55. One smooth step down. Halfway 1:45:37, no slower than 1:46:00.</dd>
+          <dt>km 21–30: West Loop → Pilsen</dt>
+          <dd>4:55 → 4:54. The sun is on you: start cooling at aid stations. Don't chase the 3:30 pacers before 30K.</dd>
+          <dt>km 30–35</dt>
+          <dd>4:54 → 4:53. Decision point. If it feels easy, the stretch cue offers 4:48–4:50/km (≈3:28). Otherwise hold.</dd>
+          <dt>km 35–41.8: Chinatown → Michigan Ave</dt>
+          <dd>4:53 → 4:52. This is where you gain on the field. SE breeze at your back going north.</dd>
+          <dt>Mile 26 → finish</dt>
+          <dd>Right onto Roosevelt Rd: a short climb over the rail yards, the only real hill. Left onto Columbus, ~300 m to go.</dd>
+        </dl>
+
+        <h3>Fuel</h3>
+        <p>Gel ~400 m before an aid station, chased with water. Take each 40 g gel in 2–3 squeezes over 30–60 s. Gatorade is optional.</p>
+        <table class="fuel">
+          <thead><tr><th>#</th><th>km</th><th>Clock</th><th>What</th></tr></thead>
+          <tbody id="plan-fuel"></tbody>
+        </table>
+        <ul>
+          <li>Your stomach decides. If it complains, delay the next gel ~10 min. Never double up.</li>
+          <li>Skip the Maurten depots (mile 12.4, 18.1), and never the caffeinated CAF 100.</li>
+          <li>Capsules: swallow whole with a full cup of water, at stations where you aren't taking a gel. The third one is only for heat or heavy salt sweating.</li>
+        </ul>
+
+        <h3>Heat</h3>
+        <ul>
+          <li>60°F at the start, 68°F and sunny by 11. Expect 1–2% slower at equal effort.</li>
+          <li>2–3 gulps of water at most stations. Drink to thirst, no more.</li>
+          <li>After ~25K, water over head and neck. Cooling zone near mile 21.2 (Cermak &amp; Archer).</li>
+          <li>Heart rate will drift up. Hold effort, not exact pace, until 30K.</li>
+        </ul>
+
+        <h3>Race morning</h3>
+        <dl class="timeline">
+          <dt>4:30</dt><dd>Wake. Usual coffee.</dd>
+          <dt>4:45</dt><dd>Breakfast (bagel or toast, honey, banana) + 1 salt capsule with ~500 ml water.</dd>
+          <dt>5:45</dt><dd>Head to Grant Park. Security, gear check, toilets.</dd>
+          <dt>7:00</dt><dd>Enter Corral E (closes 7:20). Find the 3:30 sign.</dd>
+          <dt>7:15</dt><dd>GU #1 + sips. Open the app, check GPS and screen. Headphones in.</dd>
+          <dt>~7:40</dt><dd>Tap Start on the mat. Lock, phone in the belt.</dd>
+        </dl>
+
+        <h3>Apple Watch</h3>
+        <p>Use it for heart rate and haptics. Its distance reads long (42.5+ km), so it will say "ahead" when you're only on plan. Trust the km signs and the voice.</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="Sections">
+    <button class="tabbtn" type="button" data-tab="race" aria-current="page">Race</button>
+    <button class="tabbtn" type="button" data-tab="band">Band</button>
+    <button class="tabbtn" type="button" data-tab="plan">Plan</button>
+    <button class="tabbtn" type="button" id="btn-settings">Settings</button>
+  </nav>
+</div>
+
+<!-- ===================== Pocket lock ===================== -->
+<div id="lock" class="lock" hidden>
+  <div class="lock-info" aria-live="off">
+    <span id="k-km" class="num num-l">0.0</span>
+    <span id="k-delta" class="num num-xl">0:00</span>
+    <span id="k-elapsed" class="num num-m">0:00</span>
+  </div>
+  <div class="lock-hold-wrap">
+    <button id="lock-hold" class="lock-hold" type="button" aria-label="Hold for 2 seconds to unlock">
+      <svg viewBox="0 0 100 100" aria-hidden="true"><circle class="ring-bg" cx="50" cy="50" r="46"/><circle class="ring" cx="50" cy="50" r="46"/></svg>
+      <span>Hold 2 s<br>to unlock</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===================== Settings ===================== -->
+<dialog id="settings" class="sheet" aria-label="Settings">
+  <form method="dialog" class="sheet-body">
+    <header class="sheet-head">
+      <h2>Settings</h2>
+      <button class="btn btn-small" value="close">Done</button>
+    </header>
+
+    <fieldset class="seg">
+      <legend>Pace plan</legend>
+      <label><input type="radio" name="profile" value="friend"><span>Friend's plan<small>5:10 → 5:00, then 4:57 → 4:52</small></span></label>
+      <label><input type="radio" name="profile" value="halves"><span>Even halves<small>1:45:00 / 1:44:00</small></span></label>
+    </fieldset>
+
+    <label class="field">
+      <span>Finish target</span>
+      <input id="s-target" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]:[0-5][0-9]:[0-5][0-9]" value="3:29:00" aria-describedby="s-target-err">
+    </label>
+    <p id="s-target-err" class="hint hint-warn" hidden>Use h:mm:ss, between 2:30:00 and 5:00:00.</p>
+
+    <fieldset class="seg">
+      <legend>Split cue every</legend>
+      <label><input type="radio" name="cueEveryKm" value="1"><span>1 km</span></label>
+      <label><input type="radio" name="cueEveryKm" value="2"><span>2 km</span></label>
+    </fieldset>
+
+    <fieldset class="seg">
+      <legend>Salt capsules in the race</legend>
+      <label><input type="radio" name="capsules" value="2"><span>2<small>Aid 5, 12</small></span></label>
+      <label><input type="radio" name="capsules" value="3"><span>3<small>+ Aid 16</small></span></label>
+    </fieldset>
+
+    <div class="toggles">
+      <label class="toggle"><span>Voice cues</span><input id="s-voice" type="checkbox"></label>
+      <label class="toggle"><span>Aid-station heads-up</span><input id="s-aid" type="checkbox"></label>
+      <label class="toggle"><span>Stretch cue at 30K</span><input id="s-stretch" type="checkbox"></label>
+    </div>
+
+    <div class="field field-nudge">
+      <span>Start time<small>Tapped Start late? Move it earlier.</small></span>
+      <div class="nudge">
+        <button id="s-nudge-minus" class="btn btn-small" type="button">−5 s</button>
+        <output id="s-nudge">0 s</output>
+        <button id="s-nudge-plus" class="btn btn-small" type="button">+5 s</button>
+      </div>
+    </div>
+
+    <button id="s-rehearse" class="btn btn-quiet" type="button">Rehearse the race at 60×</button>
+    <button id="s-reset" class="btn btn-danger" type="button">Reset race</button>
+
+    <p class="version">App <span id="s-version">not cached yet</span></p>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
