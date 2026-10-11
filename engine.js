@@ -148,9 +148,12 @@ function sayDur(sec) {
   const m = Math.floor(r / 60), s = r % 60;
   return `${m} minute${m === 1 ? '' : 's'}${s ? ` ${s} second${s === 1 ? '' : 's'}` : ''}`;
 }
+// Whole seconds as spoken: rounds half away from zero, so ±2.5 s is "3 seconds" either way.
+export const spokenSec = (sec) => Math.sign(sec) * Math.round(Math.abs(sec));
 export function sayAhead(sec) {
-  if (Math.abs(sec) < 1.5) return 'On plan';
-  return `${sayDur(sec)} ${sec > 0 ? 'ahead' : 'behind'}`;
+  const r = spokenSec(sec);
+  if (r === 0) return 'On plan';
+  return `${sayDur(r)} ${r > 0 ? 'ahead' : 'behind'}`;
 }
 function sayProduct(p) {
   if (/^GU #2/.test(p)) return 'the caffeinated G U';
@@ -466,7 +469,6 @@ export class RaceEngine {
   _handle(e, tc, out) {
     const s = this.settings, plan = this.plan;
     const t0 = this.startMs / 1000;
-    const aheadAt = (m) => planTimeAt(plan, m) - (tc - t0);
     switch (e.kind) {
       case 'km': {
         const k = e.k;
@@ -479,7 +481,9 @@ export class RaceEngine {
           const prevT = this.kmT[k - back];
           const per = prevT != null ? (this.kmT[k] - prevT) / back : null;
           const split = per == null ? '' : every === 1 ? ` Split ${sayPace(per)}.` : ` Last ${back} at ${sayPace(per)}.`;
-          this._emit(out, `km${k}`, 2, `Kilometer ${k}.${split} ${sayAhead(ahead)}.`, tc, e.m);
+          // From km 31: projected finish if the rest goes to plan (same rounding as spoken).
+          const proj = k >= 31 ? ` Projected ${sayClock(Math.round(plan.totalSec) - spokenSec(ahead))}.` : '';
+          this._emit(out, `km${k}`, 2, `Kilometer ${k}.${split} ${sayAhead(ahead)}.${proj}`, tc, e.m);
         }
         this._offPace(k, ahead, tc, out, e.m);
         break;
@@ -517,13 +521,11 @@ export class RaceEngine {
       case 'settle':
         this._emit(out, 'settle', 3, 'Settle in. Stay relaxed with the 3 35 group.', tc, e.m);
         break;
-      case 'stretch': {
-        const ahead = aheadAt(e.m);
-        if (s.stretchCue && ahead >= 30) {
-          this._emit(out, 'stretch', 2, `30 K, ${sayAhead(ahead)}. If it feels easy, stretch to 4 48 to 4 50. Otherwise hold.`, tc, e.m);
+      case 'stretch':
+        if (s.stretchCue) {
+          this._emit(out, 'stretch', 2, 'Decision point. Feeling strong: 4 48 from 32 K, then 4 43 after 35 K. If not, hold 4 53.', tc, e.m);
         }
         break;
-      }
       case 'hill':
         this._emit(out, 'hill', 2, 'Mile 26 ahead. Right onto Roosevelt for a short hill. Quick steps to the top, then 300 meters to go.', tc, e.m);
         break;
@@ -539,13 +541,13 @@ export class RaceEngine {
   }
 
   // > 45 s ahead or > 30 s behind at two km crossings in a row. At most every 5 km, and only
-  // again if the gap grew by 10 s. "Ease off" stays quiet after 30K (the stretch is allowed).
+  // again if the gap grew by 10 s. "Ease off" never fires from 30K on (the push is allowed).
   _offPace(k, ahead, tc, out, m) {
     const prev = this.kmAhead[k - 1];
     if (prev == null) return;
     const w = this.warn;
-    if (ahead > 45 && prev > 45 && k <= 30) {
-      if (k - w.aheadKm >= 5 && (w.aheadKm < 0 || ahead >= w.aheadMag + 10)) {
+    if (ahead > 45 && prev > 45) {
+      if (k < 30 && k - w.aheadKm >= 5 && (w.aheadKm < 0 || ahead >= w.aheadMag + 10)) {
         w.aheadKm = k;
         w.aheadMag = ahead;
         this._emit(out, `offpace-ahead-${k}`, 2, `${sayDur(ahead)} ahead of plan. Ease off a little.`, tc, m);

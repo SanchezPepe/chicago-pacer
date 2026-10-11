@@ -109,7 +109,7 @@ export const NOTES = [
   { km: 0, text: 'GPS is unreliable in the Loop for the first 5 km. The app dead-reckons on pace; trust the km signs over your watch.' },
   { km: 0.5, text: 'Tuck in with the 3:35 pace group (also in Corral E, ~5:06/km). Edge ahead of it by km 8–10.' },
   { km: 19, text: 'Back into the Loop (~km 19–22): GPS is unreliable again. Hold effort and ignore pace jumps.' },
-  { km: 30, text: '30K decision: if it feels easy, stretch to 4:48–4:50/km (≈3:28 finish). Otherwise hold 4:53.' },
+  { km: 30, text: '30K decision: if strong, 4:48 from 32K, 4:43 after 35K, empty the tank after 40K. Back off at cramps, chills or dizziness.' },
   { km: 34.1, text: 'Cooling zone near mile 21.2 (Cermak & Archer).' },
   { km: 41.843, text: 'Mile 26: right onto Roosevelt Rd, a short climb over the rail yards. Then left onto Columbus, ~300 m to go.' },
 ];

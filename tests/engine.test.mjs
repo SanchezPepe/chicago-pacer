@@ -37,7 +37,13 @@ for (const paceFactor of [1, 0.98, 1.03]) {
       const off = c.trueM - k * 1000;
       if (Math.abs(off) > Math.abs(worstKm)) worstKm = off;
       assert.ok(Math.abs(off) <= 50, `km${k} fired ${off.toFixed(1)} m from the sign`);
-      assert.match(c.text, new RegExp(`^Kilometer ${k}\\. Split \\d \\d\\d\\. (On plan|.* (ahead|behind))\\.$`));
+      const km = c.text.match(new RegExp(`^Kilometer ${k}\\. Split \\d \\d\\d\\. (?:On plan|(?:(\\d+) minutes? )?(?:(\\d+) seconds? )?(ahead|behind))\\.(?: Projected (\\d) (\\d\\d) (\\d\\d)\\.)?$`));
+      assert.ok(km, `km${k} text: ${c.text}`);
+      assert.equal(km[4] != null, k >= 31, `km${k} projected finish only from km 31`);
+      if (k >= 31) {
+        const said = km[3] ? (Number(km[1] || 0) * 60 + Number(km[2] || 0)) * (km[3] === 'ahead' ? 1 : -1) : 0;
+        assert.equal(km[4] * 3600 + km[5] * 60 + Number(km[6]), plan.totalSec - said, `km${k} projection: ${c.text}`);
+      }
     }
 
     // |aheadSec error| < 10 s for the whole race.
@@ -84,8 +90,13 @@ for (const paceFactor of [1, 0.98, 1.03]) {
     if (paceFactor === 1.03) assert.ok(behind.length >= 1, 'behind warning expected');
     if (paceFactor === 1) assert.equal(behind.length + ahead.length, 0, 'no off-pace cues on plan');
     if (paceFactor === 0.98) assert.ok(ahead.length >= 1, 'ahead warning expected at 2% fast');
-    const stretch = ids.has('stretch');
-    assert.equal(stretch, paceFactor === 0.98, 'stretch cue only when ≥ 30 s ahead at 30K');
+    assert.ok(ahead.every((x) => Number(x.id.split('-').pop()) < 30), 'no ease-off from 30K on');
+    const stretch = r.cues.filter((x) => x.id === 'stretch');
+    assert.equal(stretch.length, 1, '30K decision cue fires once');
+    assert.ok(Math.abs(stretch[0].trueM - 30000) <= 50);
+    assert.equal(stretch[0].text, 'Decision point. Feeling strong: 4 48 from 32 K, then 4 43 after 35 K. If not, hold 4 53.');
+    const km30 = r.cues.find((x) => x.id === 'km30');
+    assert.ok(r.cues.indexOf(stretch[0]) > r.cues.indexOf(km30) && stretch[0].tickMs === km30.tickMs, 'after the km30 cue');
 
     console.log(
       `# pf ${paceFactor}: max aheadSec error ${r.maxErr.toFixed(1)} s, worst km cue ${worstKm.toFixed(1)} m, ${r.cues.length} cues, ` +
@@ -95,12 +106,34 @@ for (const paceFactor of [1, 0.98, 1.03]) {
 }
 
 test('settings: 3 capsules and cues every 2 km', () => {
-  const r = runRace({ route, plan, paceFactor: 1, settings: { capsules: 3, cueEveryKm: 2, aidHeadsUp: false } });
+  const r = runRace({ route, plan, paceFactor: 1, settings: { capsules: 3, cueEveryKm: 2, aidHeadsUp: false, stretchCue: false } });
   const ids = countIds(r.cues);
   for (const c of caps) assert.equal(ids.get(c.id), 1, `${c.id} once`);
   for (let k = 1; k <= 42; k++) assert.equal(ids.has(`km${k}`), k % 2 === 0, `km${k}`);
   assert.match(r.cues.find((c) => c.id === 'km12').text, /^Kilometer 12\. Last 2 at \d \d\d\./);
+  assert.match(r.cues.find((c) => c.id === 'km32').text, /^Kilometer 32\. Last 2 at \d \d\d\. .*\. Projected 3 \d\d \d\d\.$/);
   assert.ok(![...ids.keys()].some((id) => /^aid\d+$/.test(id)), 'aidHeadsUp off');
+  assert.ok(!ids.has('stretch'), 'stretchCue off');
+});
+
+test('push after 30K (pace factor 0.975 from km 30)', () => {
+  const r = runRace({ route, plan, paceFactor: 1, scenario: { ...SCENARIO, paceSteps: [[30, 0.975]] } });
+  const ids = countIds(r.cues);
+  for (const [id, n] of ids) assert.equal(n, 1, `cue ${id} fired ${n} times`);
+  assert.ok(![...ids.keys()].some((id) => /^offpace-ahead-(3\d|4\d)$/.test(id)), 'no ease-off after 30K');
+  assert.equal(ids.get('stretch'), 1, 'decision cue once');
+  const c41 = r.cues.find((c) => c.id === 'km41');
+  const m = c41.text.match(/Projected (\d) (\d\d) (\d\d)\.$/);
+  assert.ok(m, c41.text);
+  const projected = m[1] * 3600 + m[2] * 60 + Number(m[3]);
+  const actual = (r.finishMs - START_MS) / 1000;
+  // The projection assumes plan pace for the last 1.2 km, so at 0.975 it runs ~9 s slow by
+  // design; the engine's own error is what remains after removing that.
+  const designGap = (plan.totalSec - planTimeAt(plan, 41000)) * 0.025;
+  assert.ok(Math.abs(projected - actual) <= 10, `km41 projected ${projected} vs finish ${actual.toFixed(1)}`);
+  assert.ok(Math.abs(projected - actual - designGap) <= 5, `engine error ${(projected - actual - designGap).toFixed(1)} s`);
+  assert.ok(Math.abs(r.maxErr) < 10, `aheadSec error ${r.maxErr.toFixed(1)} s`);
+  console.log(`# push: km41 "${c41.text}", finish ${actual.toFixed(1)} s, projected − finish ${(projected - actual).toFixed(1)} s (design gap ${designGap.toFixed(1)} s)`);
 });
 
 test('toJSON → fromJSON mid-race keeps state', () => {

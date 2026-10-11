@@ -22,6 +22,8 @@ function mulberry32(seed) {
 //              offsetM×(0.6–1) in a random direction while still reporting 25–60 m accuracy,
 //              between 3–15 s stretches of noisier but honest fixes; 5% report > 60 m.
 //   dropouts   [[fromKm, toKm]]: no fixes at all while the runner is inside.
+//   paceSteps  [[fromKm, factor]]: replaces paceFactor from that km on, e.g. [[30, 0.975]]
+//              for a 2.5% push after 30K.
 // The array also carries .truth(tMs) → true meters, and .finishMs.
 export function simulateRun({
   plan,
@@ -32,6 +34,7 @@ export function simulateRun({
   multipath = [],
   dropouts = [],
   paceFactor = 1,
+  paceSteps = [],
   wobble = 0.015,
   seed = 7,
   tailSec = 10,
@@ -44,6 +47,12 @@ export function simulateRun({
     while (u === 0) u = rnd();
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd());
   };
+  const steps = paceSteps.map(([km, f]) => [km * 1000, f]).sort((p, q) => p[0] - q[0]);
+  const factorAt = (m) => {
+    let f = paceFactor;
+    for (const [from, g] of steps) if (m >= from) f = g;
+    return f;
+  };
 
   // 1) The true trajectory, integrated in 0.5 s steps.
   const H = 0.5;
@@ -51,7 +60,7 @@ export function simulateRun({
   const phase = rnd() * 2 * Math.PI;
   let t = 0, d = 0, v = 0;
   while (d < MARATHON_M) {
-    v = (1000 / planPaceAt(plan, d) / paceFactor) * (1 + wobble * Math.sin((2 * Math.PI * t) / 300 + phase));
+    v = (1000 / planPaceAt(plan, d) / factorAt(d)) * (1 + wobble * Math.sin((2 * Math.PI * t) / 300 + phase));
     t += H;
     d += v * H;
     D.push(Math.min(d, MARATHON_M));
